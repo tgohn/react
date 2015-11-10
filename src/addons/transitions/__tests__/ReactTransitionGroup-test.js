@@ -269,4 +269,80 @@ describe('ReactTransitionGroup', function() {
       'willLeave2', 'didLeave2', 'willUnmount0', 'willUnmount1', 'willUnmount2',
     ]);
   });
+
+  it('should handle entering/leaving several animated elements at once', function() {
+    var log = [];
+    var callbackQueue = [];
+
+    var flushCallbackQueue = function() {
+      for (var i =0; i < callbackQueue.length; i++) {
+        callbackQueue[i]();
+      }
+    }
+
+    var Child = React.createClass({
+      componentDidMount: function() {
+        log.push('didMount' + this.props.id);
+      },
+      componentWillEnter: function(cb) {
+        log.push('willEnter' + this.props.id);
+        callbackQueue.push(cb);
+      },
+      componentDidEnter: function() {
+        log.push('didEnter' + this.props.id);
+      },
+      componentWillLeave: function(cb) {
+        log.push('willLeave' + this.props.id);
+        callbackQueue.push(cb);
+      },
+      componentDidLeave: function() {
+        log.push('didLeave' + this.props.id);
+      },
+      componentWillUnmount: function() {
+        log.push('willUnmount' + this.props.id);
+      },
+      render: function() {
+        return <span />;
+      },
+    });
+
+    var Component = React.createClass({
+      getInitialState: function() {
+        return {count: 1};
+      },
+      render: function() {
+        var children = [];
+        for (var i = 0; i < this.state.count; i++) {
+          children.push(<Child key={i} id={i} />);
+        }
+        return <ReactTransitionGroup>{children}</ReactTransitionGroup>;
+      },
+    });
+
+    var instance = ReactDOM.render(<Component />, container);
+    expect(log).toEqual(['didMount0']);
+    log = [];
+
+    instance.setState({count: 3});
+    expect(log).toEqual([
+      'didMount1', 'didMount2', 'willEnter1', 'willEnter2',
+    ]);
+    flushCallbackQueue();  // finish all Enter animation callbacks
+    expect(log).toEqual([
+      'didMount1', 'didMount2', 'willEnter1', 'willEnter2',
+      'didEnter1', 'didEnter2'
+    ]);
+    log = [];
+
+    instance.setState({count: 0});
+    expect(log).toEqual([
+      'willLeave0', 'willLeave1', 'willLeave2'
+    ]);
+    flushCallbackQueue();  // finish all Leave animation callbacks
+    expect(log).toEqual([
+      'willLeave0', 'willLeave1', 'willLeave2',
+      'didLeave0', 'didLeave1', 'didLeave2',
+      'willUnmount0', 'willUnmount1', 'willUnmount2'
+    ]);
+  });
 });
